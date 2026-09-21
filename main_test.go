@@ -19,7 +19,7 @@ rules:
       - developer
     models:
       - gemini-*
-    pattern: '(?i)(You are Codex,\\s+[^.]+?)\\s+based on\\s+[^.]+(\\.?)'
+    pattern: '(?i)(You are Codex,\s+[^.]+?)\s+based on\s+[^.]+(\.?)'
     replacement: '${1}${2}'
 `
 
