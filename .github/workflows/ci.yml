@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN_ID: antigravity-request-rewrite
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test -mod=mod ./...
+      - name: Vet
+        run: go vet -mod=mod ./...
+
+  build-linux:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "${GITHUB_ENV}"
+          else
+            echo "VERSION=0.1.0-dev" >> "${GITHUB_ENV}"
+          fi
+      - name: Build
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=1 GOOS=linux GOARCH=${{ matrix.arch }} \
+            go build -mod=mod -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
+            -o "dist/${PLUGIN_ID}.so" .
+          rm -f "dist/${PLUGIN_ID}.h"
+      - name: Package
+        run: |
+          cd dist
+          zip "../${PLUGIN_ID}_${VERSION}_linux_${{ matrix.arch }}.zip" "${PLUGIN_ID}.so"
+          cd ..
+          sha256sum "${PLUGIN_ID}_${VERSION}_linux_${{ matrix.arch }}.zip" > "${PLUGIN_ID}_${VERSION}_linux_${{ matrix.arch }}.zip.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_ID }}-linux-${{ matrix.arch }}
+          path: |
+            ${{ env.PLUGIN_ID }}_*.zip
+            ${{ env.PLUGIN_ID }}_*.sha256
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          cat *.sha256 > checksums.txt
+          gh release create "${GITHUB_REF_NAME}" *.zip checksums.txt \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
