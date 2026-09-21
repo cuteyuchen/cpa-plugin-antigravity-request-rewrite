@@ -1,6 +1,6 @@
 # CPA Antigravity Request Rewrite
 
-A CLIProxyAPI v7 request interceptor for safely rewriting system/developer prompt text **only when the selected upstream is Antigravity**.
+A CLIProxyAPI v7 request interceptor for safely rewriting system/developer prompt text on explicitly selected upstream formats. It defaults to Antigravity for backward compatibility, but can also target Codex, xAI/Grok, or other CPA `ToFormat` values.
 
 The plugin is designed for compatibility fixes that should not be hard-coded into CLIProxyAPI itself. Rules are configured in YAML and can use either literal replacement or precompiled Go regular expressions.
 
@@ -17,7 +17,8 @@ Instead of hard-coding one exact sentence, the plugin can normalize a family of 
 ## Safety model
 
 - Runs at `request.intercept_after`.
-- Does nothing unless `ToFormat == "antigravity"`.
+- Runs only when `ToFormat` matches `target_formats`. If `target_formats` is omitted, it defaults to `antigravity`.
+- Accepts `grok`, `x-ai`, and `x.ai` as aliases for CPA's canonical `xai` target format.
 - Rewrites only known system/developer prompt locations.
 - Does not recursively scan arbitrary JSON.
 - Leaves user/assistant/tool content, tool definitions/results, function arguments and reasoning untouched.
@@ -44,6 +45,12 @@ plugins:
     antigravity-request-rewrite:
       enabled: true
       priority: 1
+
+      target_formats:
+        - antigravity
+        - codex
+        - grok
+
       rules:
         - name: codex-identity-normalize
           mode: regex_replace
@@ -73,6 +80,23 @@ You are Codex, an agent.
 You are Codex, a coding agent.
 You are Codex, an advanced coding agent.
 ```
+
+### Target formats
+
+`target_formats` controls which selected upstream formats are allowed to run the rewrite rules. It is matched against CPA's after-auth `req.ToFormat`, not the model name.
+
+Common values include:
+
+- `antigravity`
+- `codex`
+- `xai` (you may also write `grok`, `x-ai`, or `x.ai`)
+- `gemini`
+- `claude`
+- `openai`
+- `kimi`
+- `*` to allow any target format
+
+If the field is omitted or empty, the plugin defaults to `antigravity`, preserving the original behavior.
 
 ### Rule fields
 
@@ -107,7 +131,7 @@ GET /v0/management/plugins
 
 Confirm `antigravity-request-rewrite` reports `registered: true` and `effective_enabled: true`.
 
-Then send an OpenAI Responses request through an Antigravity-backed model and verify the configured identity text is normalized before upstream execution.
+Then send an OpenAI Responses request through one of the configured target upstreams and verify the configured identity text is normalized before upstream execution.
 
 ## Development
 

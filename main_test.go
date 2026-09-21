@@ -181,32 +181,90 @@ func TestModelAndSourceFormatFilters(t *testing.T) {
 	}
 }
 
-func TestInterceptAfterAuthIsAntigravityOnly(t *testing.T) {
+func TestTargetFormatsDefaultToAntigravity(t *testing.T) {
 	cfg := mustConfig(t, codexRuleYAML)
+
+	if !targetFormatEnabled(cfg, "antigravity") {
+		t.Fatal("default target_formats should include antigravity")
+	}
+	for _, format := range []string{"codex", "xai", "gemini"} {
+		if targetFormatEnabled(cfg, format) {
+			t.Fatalf("default target_formats unexpectedly includes %q", format)
+		}
+	}
+}
+
+func TestTargetFormatAliases(t *testing.T) {
+	cfg := mustConfig(t, `
+target_formats:
+  - codex
+  - grok
+  - anti-gravity
+rules:
+  - name: literal
+    mode: replace
+    pattern: "foo"
+    replacement: "bar"
+`)
+
+	for _, format := range []string{"codex", "xai", "grok", "antigravity"} {
+		if !targetFormatEnabled(cfg, format) {
+			t.Fatalf("target_formats should match %q", format)
+		}
+	}
+	if targetFormatEnabled(cfg, "gemini") {
+		t.Fatal("target_formats unexpectedly matches gemini")
+	}
+}
+
+func TestInterceptAfterAuthRewritesConfiguredTargets(t *testing.T) {
+	cfg := mustConfig(t, "target_formats:\n  - codex\n  - grok\n  - antigravity\n"+codexRuleYAML)
 	configState.Lock()
 	configState.cfg = cfg
 	configState.Unlock()
 
-	payload := pluginapi.RequestInterceptRequest{
-		SourceFormat: "openai-response",
-		ToFormat:     "codex",
-		Model:        "gemini-3.8-flash-high",
-		Body:         []byte(`{"instructions":"You are Codex, a coding agent based on GPT-5."}`),
-	}
-	raw, _ := json.Marshal(payload)
-	result, err := interceptAfterAuth(raw)
-	if err != nil {
-		t.Fatalf("interceptAfterAuth() error = %v", err)
-	}
+	for _, tc := range []struct {
+		toFormat string
+		changed  bool
+	}{
+		{toFormat: "codex", changed: true},
+		{toFormat: "xai", changed: true},
+		{toFormat: "antigravity", changed: true},
+		{toFormat: "gemini", changed: false},
+	} {
+		t.Run(tc.toFormat, func(t *testing.T) {
+			payload := pluginapi.RequestInterceptRequest{
+				SourceFormat: "openai-response",
+				ToFormat:     tc.toFormat,
+				Model:        "gemini-3.8-flash-high",
+				Body:         []byte(`{"instructions":"You are Codex, a coding agent based on GPT-5."}`),
+			}
+			raw, _ := json.Marshal(payload)
+			result, err := interceptAfterAuth(raw)
+			if err != nil {
+				t.Fatalf("interceptAfterAuth() error = %v", err)
+			}
 
-	var envelope struct {
-		Result pluginapi.RequestInterceptResponse `json:"result"`
-	}
-	if err := json.Unmarshal(result, &envelope); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(envelope.Result.Body) != 0 {
-		t.Fatalf("non-Antigravity request was modified: %s", envelope.Result.Body)
+			var envelope struct {
+				Result pluginapi.RequestInterceptResponse `json:"result"`
+			}
+			if err := json.Unmarshal(result, &envelope); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+
+			if tc.changed {
+				if len(envelope.Result.Body) == 0 {
+					t.Fatal("configured target request was not modified")
+				}
+				if !strings.Contains(string(envelope.Result.Body), "You are Codex, a coding agent.") {
+					t.Fatalf("rewritten body missing normalized identity: %s", envelope.Result.Body)
+				}
+				return
+			}
+			if len(envelope.Result.Body) != 0 {
+				t.Fatalf("unconfigured target request was modified: %s", envelope.Result.Body)
+			}
+		})
 	}
 }
 
