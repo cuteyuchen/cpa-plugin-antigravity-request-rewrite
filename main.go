@@ -69,7 +69,8 @@ type registrationCapabilities struct {
 }
 
 type rawConfig struct {
-	Rules []rawRule `yaml:"rules"`
+	TargetFormats []string  `yaml:"target_formats"`
+	Rules         []rawRule `yaml:"rules"`
 }
 
 type rawRule struct {
@@ -84,7 +85,8 @@ type rawRule struct {
 }
 
 type compiledConfig struct {
-	Rules []compiledRule
+	TargetFormats map[string]struct{}
+	Rules         []compiledRule
 }
 
 type compiledRule struct {
@@ -181,6 +183,11 @@ func pluginRegistration() registration {
 			GitHubRepository: "https://github.com/cuteyuchen/cpa-plugin-antigravity-request-rewrite",
 			ConfigFields: []pluginapi.ConfigField{
 				{
+					Name:        "target_formats",
+					Type:        pluginapi.ConfigFieldTypeArray,
+					Description: "Target upstream formats to rewrite. Defaults to antigravity. grok/x-ai aliases normalize to xai.",
+				},
+				{
 					Name:        "rules",
 					Type:        pluginapi.ConfigFieldTypeArray,
 					Description: "Ordered request rewrite rules. Supports replace and regex_replace modes.",
@@ -223,7 +230,15 @@ func compileConfig(raw []byte) (compiledConfig, error) {
 		}
 	}
 
-	out := compiledConfig{Rules: make([]compiledRule, 0, len(cfg.Rules))}
+	targetFormats := normalizeTargetFormatSet(cfg.TargetFormats)
+	if len(targetFormats) == 0 {
+		targetFormats = map[string]struct{}{"antigravity": {}}
+	}
+
+	out := compiledConfig{
+		TargetFormats: targetFormats,
+		Rules:         make([]compiledRule, 0, len(cfg.Rules)),
+	}
 	for i, rule := range cfg.Rules {
 		if rule.Enabled != nil && !*rule.Enabled {
 			continue
@@ -337,11 +352,49 @@ func normalizeFormat(value string) string {
 	}
 }
 
+func normalizeTargetFormat(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "anti-gravity":
+		return "antigravity"
+	case "grok", "x-ai", "x.ai":
+		return "xai"
+	default:
+		return value
+	}
+}
+
+func normalizeTargetFormatSet(values []string) map[string]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = normalizeTargetFormat(value)
+		if value != "" {
+			out[value] = struct{}{}
+		}
+	}
+	return out
+}
+
+func targetFormatEnabled(cfg compiledConfig, toFormat string) bool {
+	normalized := normalizeTargetFormat(toFormat)
+	if _, ok := cfg.TargetFormats["*"]; ok {
+		return true
+	}
+	_, ok := cfg.TargetFormats[normalized]
+	return ok
+}
+
 func currentConfig() compiledConfig {
 	configState.RLock()
 	defer configState.RUnlock()
 
-	out := compiledConfig{Rules: make([]compiledRule, len(configState.cfg.Rules))}
+	out := compiledConfig{
+		TargetFormats: configState.cfg.TargetFormats,
+		Rules:         make([]compiledRule, len(configState.cfg.Rules)),
+	}
 	copy(out.Rules, configState.cfg.Rules)
 	return out
 }
@@ -352,11 +405,10 @@ func interceptAfterAuth(raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("decode request.intercept_after request: %w", err)
 	}
 
-	if !strings.EqualFold(strings.TrimSpace(req.ToFormat), "antigravity") {
+	cfg := currentConfig()
+	if !targetFormatEnabled(cfg, req.ToFormat) {
 		return okEnvelope(pluginapi.RequestInterceptResponse{})
 	}
-
-	cfg := currentConfig()
 	if len(cfg.Rules) == 0 || len(req.Body) == 0 {
 		return okEnvelope(pluginapi.RequestInterceptResponse{})
 	}
