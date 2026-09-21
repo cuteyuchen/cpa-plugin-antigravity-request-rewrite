@@ -82,7 +82,7 @@ jobs:
         run: |
           mkdir -p "dist/${{ matrix.goos }}_${{ matrix.goarch }}"
           CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -mod=mod -trimpath -buildmode=c-shared \
+            go build -mod=mod -trimpath -buildvcs=false -buildmode=c-shared \
             -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
             -o "dist/${{ matrix.goos }}_${{ matrix.goarch }}/${PLUGIN_ID}.${{ matrix.ext }}" .
       - name: Build on Windows
@@ -91,7 +91,7 @@ jobs:
         run: |
           mkdir -p "dist/${{ matrix.goos }}_${{ matrix.goarch }}"
           CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -mod=mod -trimpath -buildmode=c-shared \
+            go build -mod=mod -trimpath -buildvcs=false -buildmode=c-shared \
             -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
             -o "dist/${{ matrix.goos }}_${{ matrix.goarch }}/${PLUGIN_ID}.${{ matrix.ext }}" .
       - name: Package
@@ -167,7 +167,7 @@ jobs:
               export PATH="/usr/local/go/bin:${PATH}"
 
               CGO_ENABLED=1 GOOS=linux GOARCH="${GOARCH}" \
-                go build -mod=mod -trimpath -buildmode=c-shared \
+                go build -mod=mod -trimpath -buildvcs=false -buildmode=c-shared \
                 -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
                 -o "dist/linux_${GOARCH}/request-rewrite.so" .
 
@@ -309,7 +309,7 @@ jobs:
           GOARCH=amd64 \
           CGO_LDFLAGS="-fuse-ld=lld" \
           CC="clang --target=x86_64-unknown-freebsd14 --sysroot=${sysroot_dir}" \
-            go build -mod=mod -trimpath -buildmode=c-shared \
+            go build -mod=mod -trimpath -buildvcs=false -buildmode=c-shared \
             -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
             -o "dist/freebsd_amd64/${PLUGIN_ID}.so" .
       - name: Package
