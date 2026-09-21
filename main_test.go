@@ -113,7 +113,7 @@ func TestResponsesOnlyRewritesSystemAndDeveloperPromptLocations(t *testing.T) {
 }
 
 func TestChatAnthropicAndGeminiPromptCoverage(t *testing.T) {
-	cfg := mustConfig(t, strings.ReplaceAll(codexRuleYAML, "source_formats:\n      - openai-response\n", ""))
+	cfg := mustConfig(t, strings.Replace(codexRuleYAML, "    source_formats:\n      - openai-response\n", "", 1))
 	old := "You are Codex, a coding agent based on GPT-5."
 	want := "You are Codex, a coding agent."
 
