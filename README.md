@@ -6,7 +6,7 @@ The plugin is designed for compatibility fixes that should not be hard-coded int
 
 ## Why
 
-Some Antigravity upstream requests are sensitive to client-injected identity text. A verified example is the Codex identity family:
+Some upstream compatibility cases require normalizing client-injected identity text before provider-specific request execution. One tested example is the Codex identity family:
 
 ```text
 You are Codex, a coding agent based on GPT-5.
@@ -59,8 +59,6 @@ plugins:
           scopes:
             - system
             - developer
-          models:
-            - "gemini-*"
           pattern: '(?i)(You are Codex,\s+[^.]+?)\s+based on\s+[^.]+(\.?)'
           replacement: '${1}${2}'
 ```
