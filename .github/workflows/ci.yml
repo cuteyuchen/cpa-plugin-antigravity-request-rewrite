@@ -26,9 +26,9 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Test
-        run: go test ./...
+        run: go test -mod=mod ./...
       - name: Vet
-        run: go vet ./...
+        run: go vet -mod=mod ./...
 
   build-linux:
     needs: test
@@ -58,7 +58,7 @@ jobs:
         run: |
           mkdir -p dist
           CGO_ENABLED=1 GOOS=linux GOARCH=${{ matrix.arch }} \
-            go build -trimpath -buildmode=c-shared \
+            go build -mod=mod -trimpath -buildmode=c-shared \
             -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
             -o "dist/${PLUGIN_ID}.so" .
           rm -f "dist/${PLUGIN_ID}.h"
