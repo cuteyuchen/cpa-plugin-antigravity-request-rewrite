@@ -1,4 +1,4 @@
-module github.com/cuteyuchen/cpa-plugin-antigravity-request-rewrite
+module github.com/cuteyuchen/cpa-plugin-request-rewrite
 
 go 1.26.0
 

@@ -48,7 +48,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const pluginID = "antigravity-request-rewrite"
+const pluginID = "request-rewrite"
 
 var pluginVersion = "0.1.0-dev"
 
@@ -177,10 +177,10 @@ func pluginRegistration() registration {
 	return registration{
 		SchemaVersion: pluginabi.SchemaVersion,
 		Metadata: pluginapi.Metadata{
-			Name:             "Antigravity Request Rewrite",
+			Name:             "CPA Request Rewrite",
 			Version:          pluginVersion,
 			Author:           "cuteyuchen",
-			GitHubRepository: "https://github.com/cuteyuchen/cpa-plugin-antigravity-request-rewrite",
+			GitHubRepository: "https://github.com/cuteyuchen/cpa-plugin-request-rewrite",
 			ConfigFields: []pluginapi.ConfigField{
 				{
 					Name:        "target_formats",
