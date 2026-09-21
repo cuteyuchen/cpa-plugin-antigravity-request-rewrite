@@ -140,7 +140,7 @@ func TestChatAnthropicAndGeminiPromptCoverage(t *testing.T) {
 		{
 			name:   "antigravity-wrapper",
 			format: "gemini",
-			body:   `{"model":"gemini-3.8-flash-high","request":{"systemInstruction":{"parts":[{"text":"` + old + `"}]},"contents":[{"role":"user","parts":[{"text":"` + old + `"}]}}}`,
+			body:   `{"model":"gemini-3.8-flash-high","request":{"systemInstruction":{"parts":[{"text":"` + old + `"}]},"contents":[{"role":"user","parts":[{"text":"` + old + `"}]}]}}`,
 		},
 	}
 
