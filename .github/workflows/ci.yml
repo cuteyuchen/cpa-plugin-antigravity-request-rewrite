@@ -198,25 +198,11 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
-  build-cross:
-    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+  build-windows-arm64:
+    name: Build windows/arm64
     needs: test
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: windows-arm64
-            goos: windows
-            goarch: arm64
-            out_dir: dist/windows_arm64
-            library: request-rewrite.dll
-          - target: freebsd-amd64
-            goos: freebsd
-            goarch: amd64
-            out_dir: dist/freebsd_amd64
-            library: request-rewrite.so
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -240,21 +226,102 @@ jobs:
         with:
           dir: .
           packages: .
-          targets: ${{ matrix.target }}
-          out-dir: ${{ matrix.out_dir }}
-          output: ${{ matrix.library }}
+          targets: windows-arm64
+          out-dir: dist/windows_arm64
+          output: request-rewrite.dll
           flags: -ldflags=-s -w
           x-flags: main.pluginVersion=${{ steps.meta.outputs.version }}
       - name: Package
         shell: bash
         run: |
           go run ./.github/scripts/package-release.go \
-            -library "${{ matrix.out_dir }}/${{ matrix.library }}" \
-            -archive "dist/${PLUGIN_ID}_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.zip" \
-            -checksum "dist/${PLUGIN_ID}_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.zip.sha256"
+            -library "dist/windows_arm64/${PLUGIN_ID}.dll" \
+            -archive "dist/${PLUGIN_ID}_${VERSION}_windows_arm64.zip" \
+            -checksum "dist/${PLUGIN_ID}_${VERSION}_windows_arm64.zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          name: windows-arm64
+          path: |
+            dist/${{ env.PLUGIN_ID }}_*.zip
+            dist/${{ env.PLUGIN_ID }}_*.zip.sha256
+          compression-level: 0
+          if-no-files-found: error
+
+  build-freebsd:
+    name: Build freebsd/amd64
+    needs: test
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+      - name: Install FreeBSD cross-build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld curl
+      - name: Build FreeBSD plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/freebsd_amd64
+          sysroot_dir="/tmp/freebsd-sysroot"
+          rm -rf "${sysroot_dir}"
+          mkdir -p "${sysroot_dir}"
+          trap 'sudo rm -rf "${sysroot_dir}" /tmp/freebsd-base.txz' EXIT
+
+          urls=(
+            "https://download.freebsd.org/releases/amd64/14.4-RELEASE/base.txz"
+            "https://archive.freebsd.org/old-releases/amd64/14.4-RELEASE/base.txz"
+            "https://archive.freebsd.org/old-releases/amd64/14.3-RELEASE/base.txz"
+          )
+
+          downloaded=false
+          for url in "${urls[@]}"; do
+            echo "Downloading FreeBSD sysroot from ${url}"
+            if curl -fsSL --retry 3 --retry-connrefused "${url}" -o /tmp/freebsd-base.txz; then
+              downloaded=true
+              break
+            fi
+          done
+          if [[ "${downloaded}" != "true" ]]; then
+            echo "failed to download FreeBSD base.txz" >&2
+            exit 1
+          fi
+
+          sudo tar -xf /tmp/freebsd-base.txz -C "${sysroot_dir}"
+          rm -f /tmp/freebsd-base.txz
+
+          CGO_ENABLED=1 \
+          GOOS=freebsd \
+          GOARCH=amd64 \
+          CGO_LDFLAGS="-fuse-ld=lld" \
+          CC="clang --target=x86_64-unknown-freebsd14 --sysroot=${sysroot_dir}" \
+            go build -mod=mod -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${VERSION}" \
+            -o "dist/freebsd_amd64/${PLUGIN_ID}.so" .
+      - name: Package
+        shell: bash
+        run: |
+          go run ./.github/scripts/package-release.go \
+            -library "dist/freebsd_amd64/${PLUGIN_ID}.so" \
+            -archive "dist/${PLUGIN_ID}_${VERSION}_freebsd_amd64.zip" \
+            -checksum "dist/${PLUGIN_ID}_${VERSION}_freebsd_amd64.zip.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-amd64
           path: |
             dist/${{ env.PLUGIN_ID }}_*.zip
             dist/${{ env.PLUGIN_ID }}_*.zip.sha256
@@ -266,7 +333,8 @@ jobs:
     needs:
       - build-hosted
       - build-linux
-      - build-cross
+      - build-windows-arm64
+      - build-freebsd
     runs-on: ubuntu-24.04
     permissions:
       contents: write
