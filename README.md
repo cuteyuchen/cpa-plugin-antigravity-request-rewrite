@@ -111,6 +111,24 @@ If the field is omitted or empty, the plugin defaults to `antigravity`, preservi
 
 Rules are applied in order.
 
+## Supported platforms
+
+Release assets cover every platform/architecture for which the official CLIProxyAPI release currently enables dynamic-library plugins:
+
+| OS | Architecture | Asset |
+| --- | --- | --- |
+| Linux (glibc) | amd64 | `request-rewrite_<version>_linux_amd64.zip` |
+| Linux (glibc) | arm64 | `request-rewrite_<version>_linux_arm64.zip` |
+| macOS (Darwin) | amd64 | `request-rewrite_<version>_darwin_amd64.zip` |
+| macOS (Darwin) | arm64 | `request-rewrite_<version>_darwin_arm64.zip` |
+| Windows | amd64 | `request-rewrite_<version>_windows_amd64.zip` |
+| Windows | arm64 | `request-rewrite_<version>_windows_arm64.zip` |
+| FreeBSD | amd64 | `request-rewrite_<version>_freebsd_amd64.zip` |
+
+Linux release libraries are built against the same GLIBC 2.17 baseline used by the official plugin-capable CLIProxyAPI Linux builds.
+
+CLIProxyAPI also publishes `*_no-plugin` binaries for some platforms, including portable Linux builds and FreeBSD arm64. Those binaries intentionally disable dynamic-library plugins, so this project does not publish plugin assets for those targets.
+
 ## Build
 
 CLIProxyAPI dynamic plugins use CGO.
@@ -119,7 +137,7 @@ CLIProxyAPI dynamic plugins use CGO.
 CGO_ENABLED=1 go build -buildmode=c-shared -o request-rewrite.so .
 ```
 
-For the Oracle A1 / Linux ARM64 target, use the GitHub Actions artifact produced by the repository workflow.
+For installed releases, download the ZIP matching the CPA host OS and architecture from GitHub Releases and verify it against `checksums.txt`.
 
 ## Verify
 
