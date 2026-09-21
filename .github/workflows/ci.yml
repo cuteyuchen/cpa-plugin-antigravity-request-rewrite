@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_ID: antigravity-request-rewrite
+  PLUGIN_ID: request-rewrite
 
 jobs:
   test:
