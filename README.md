@@ -1,6 +1,6 @@
-# CPA Antigravity Request Rewrite
+# CPA Request Rewrite
 
-A CLIProxyAPI v7 request interceptor for safely rewriting system/developer prompt text on explicitly selected upstream formats. It defaults to Antigravity for backward compatibility, but can also target Codex, xAI/Grok, or other CPA `ToFormat` values.
+A CLIProxyAPI v7 request interceptor for safely rewriting system/developer prompt text on explicitly selected upstream formats. It can target Antigravity, Codex, xAI/Grok, or any other CPA `ToFormat` value.
 
 The plugin is designed for compatibility fixes that should not be hard-coded into CLIProxyAPI itself. Rules are configured in YAML and can use either literal replacement or precompiled Go regular expressions.
 
@@ -42,7 +42,7 @@ plugins:
   enabled: true
   dir: "plugins"
   configs:
-    antigravity-request-rewrite:
+    request-rewrite:
       enabled: true
       priority: 1
 
@@ -116,7 +116,7 @@ Rules are applied in order.
 CLIProxyAPI dynamic plugins use CGO.
 
 ```bash
-CGO_ENABLED=1 go build -buildmode=c-shared -o antigravity-request-rewrite.so .
+CGO_ENABLED=1 go build -buildmode=c-shared -o request-rewrite.so .
 ```
 
 For the Oracle A1 / Linux ARM64 target, use the GitHub Actions artifact produced by the repository workflow.
@@ -129,7 +129,7 @@ After installing the shared library and restarting CLIProxyAPI:
 GET /v0/management/plugins
 ```
 
-Confirm `antigravity-request-rewrite` reports `registered: true` and `effective_enabled: true`.
+Confirm `request-rewrite` reports `registered: true` and `effective_enabled: true`.
 
 Then send an OpenAI Responses request through one of the configured target upstreams and verify the configured identity text is normalized before upstream execution.
 
